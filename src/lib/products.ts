@@ -4,36 +4,81 @@ import { friendlyError, getSupabase } from './supabase'
 const PAGE_SIZE = 12
 
 function numeric(value: string) {
+  if (value.trim() === '') return undefined
+
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
 export async function getCatalog(filters: CatalogFilters, page = 0): Promise<CatalogResult> {
   const supabase = getSupabase()
-  let query = supabase.from('catalog_products').select('*', { count: 'exact' })
+
+  let query = supabase
+    .from('catalog_products')
+    .select('*', { count: 'exact' })
 
   const search = filters.search.trim().toLowerCase().replace(/[%,()]/g, ' ')
-  if (search) query = query.ilike('search_text', `%${search}%`)
+
+  if (search) {
+    query = query.ilike('search_text', `%${search}%`)
+  }
+
   const minPrice = numeric(filters.minPrice)
   const maxPrice = numeric(filters.maxPrice)
   const minGold = numeric(filters.minGold)
   const rank = numeric(filters.rank)
-  if (minPrice !== undefined) query = query.gte('price', minPrice)
-  if (maxPrice !== undefined) query = query.lte('price', maxPrice)
-  if (minGold !== undefined) query = query.gte('gold', minGold)
-  if (rank !== undefined) query = query.eq('rank', rank)
-  if (filters.nation) query = query.contains('nations', [filters.nation])
-  if (filters.status) query = query.eq('status', filters.status)
-  if (filters.premiumOnly) query = query.not('premium_vehicles', 'eq', '{}')
 
-  if (filters.sort === 'price_asc') query = query.order('price', { ascending: true })
-  else if (filters.sort === 'price_desc') query = query.order('price', { ascending: false })
-  else query = query.order('created_at', { ascending: false })
+  if (minPrice !== undefined) {
+    query = query.gte('price', minPrice)
+  }
+
+  if (maxPrice !== undefined) {
+    query = query.lte('price', maxPrice)
+  }
+
+  if (minGold !== undefined) {
+    query = query.gte('gold', minGold)
+  }
+
+  if (rank !== undefined) {
+    query = query.eq('rank', rank)
+  }
+
+  if (filters.nation) {
+    query = query.contains('nations', [filters.nation])
+  }
+
+  if (filters.status) {
+    query = query.eq('status', filters.status)
+  }
+
+  if (filters.premiumOnly) {
+    query = query.not('premium_vehicles', 'eq', '{}')
+  }
+
+  if (filters.sort === 'price_asc') {
+    query = query.order('price', { ascending: true })
+  } else if (filters.sort === 'price_desc') {
+    query = query.order('price', { ascending: false })
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
 
   const from = page * PAGE_SIZE
-  const { data, error, count } = await query.range(from, from + PAGE_SIZE - 1)
-  if (error) throw new Error(friendlyError(error, 'Не удалось загрузить каталог.'))
-  return { products: (data ?? []) as PublicProduct[], total: count ?? 0 }
+
+  const { data, error, count } = await query.range(
+    from,
+    from + PAGE_SIZE - 1
+  )
+
+  if (error) {
+    throw new Error(friendlyError(error, 'Не удалось загрузить каталог.'))
+  }
+
+  return {
+    products: (data ?? []) as PublicProduct[],
+    total: count ?? 0,
+  }
 }
 
 export async function getLatestProducts(limit = 3) {
